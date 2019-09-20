@@ -6,14 +6,31 @@ import csv
 import time
 
 
+
+
 time_flag = True
+
+top_news_title = ""
+
+f = open('BBC_news.csv', 'a')
+writer = csv.writer(f, lineterminator='\n')
+f.close()
+
+csv_file = open("BBC_news.csv", "r", encoding="ms932", errors="", newline="" )
+csv_read = csv.reader(csv_file, delimiter=",", doublequote=True, lineterminator="\r\n", quotechar='"', skipinitialspace=True)
+for row in csv_read:
+    top_news_title = row[2]
+csv_file.close()
+
+print("top_news_title is ",top_news_title)
 
 # 永久に実行させます
 while True:
+
     # 時間が59分以外の場合は58秒間時間を待機する
     #if (datetime.now().minute != 59 and datetime.now().minute != 21 and datetime.now().minute != 29 and datetime.now().minute != 48 and datetime.now().minute != 16):
         # 59分ではないので1分(58秒)間待機します(誤差がないとは言い切れないので58秒です)
-    time.sleep(58)
+    #time.sleep(58)
         #continue
 
     # csvを追記モードで開きます→ここでcsvを開くのはファイルが大きくなった時にcsvを開くのに時間がかかるためです
@@ -29,13 +46,6 @@ while True:
 
     # csvに記述するレコードを作成します
     csv_list = []
-
-
-
-    # 現在の時刻を年、月、日、時、分、秒で取得します
-    time_ = datetime.now().strftime("%Y/%m/%d %H:%M:%S")
-    # 1カラム目に時間を挿入します
-    csv_list.append(time_)
 
     # アクセスするURL
     url = "https://www.bbc.com/news/uk"
@@ -84,7 +94,7 @@ while True:
 
     latest_news_string = latest_news_string.find_all("span")
 
-
+#Latest Updataから記事のタイトルと記事の日付を取得
     for i in range(len(latest_news_string)):
         string_ = latest_news_string[i]
         try:
@@ -99,23 +109,33 @@ while True:
             pass
 
 
+    #Latest Updateの最新の記事のタイトルを取得
     most_latest_news_title = latest_title_list[0]
+    #Latest Updateの最新の記事日付を取得
     most_latest_news_time = latest_time_list[0]
 
-   
 
-    # URLにアクセスする htmlが帰ってくる → <html><head><title>経済、株価、ビジネス、政治のニュース:日経電子版</title></head><body....
-    html = urllib.request.urlopen(url)
+    if(most_latest_news_title != top_news_title):
+        # 現在の時刻を年、月、日、時、分、秒で取得します
+        time_ = datetime.now().strftime("%Y/%m/%d %H:%M:%S")
+        # 1カラム目に時間を挿入します
+        csv_list.append(time_)
+        # 2カラム目に記事の時間を記録します
+        csv_list.append(most_latest_news_time)
+        # 3カラム目に記事のタイトルを記録します
+        csv_list.append(most_latest_news_title)
+         # 摘出した日経平均株価を時間とともに出力します。
+        print("記事の更新あり")
+        print(time_, most_latest_news_time, most_latest_news_title)
 
-    # 摘出した日経平均株価を時間とともに出力します。
-    print(time_, most_latest_news_time, most_latest_news_title)
-    # 2カラム目に記事の時間を記録します
-    csv_list.append(most_latest_news_time)
-    # 3カラム目に記事のタイトルを記録します
-    csv_list.append(most_latest_news_title)
-    # csvに追記敷きます
-    writer.writerow(csv_list)
+        top_news_title = most_latest_news_title
+        # csvに追記敷きます
+        writer.writerow(csv_list)
+    else:
+        print("記事の更新なし")
     # ファイル破損防止のために閉じます
     f.close()
 
+
+   
 #---------------------------------------------------------------------------
