@@ -10,7 +10,7 @@ import csv
 from dateutil.relativedelta import relativedelta
 import oandapy
 
-
+csv_data = "BBC_news.csv"
 
 def datetime_change(a_t):
     if(16 <= a_t.hour <= 23):
@@ -21,31 +21,37 @@ def datetime_change(a_t):
         a_t = "{0:%Y/%m/%d %H:%M:%S}".format(a_t)
         return a_t
         
+def make_csv(csv_name):
+    f = open(csv_data, 'a')
+    writer = csv.writer(f, lineterminator='\n')
+    f.close()
 
-f = open('BBC_news.csv', 'a')
-writer = csv.writer(f, lineterminator='\n')
-f.close()
+def get_article_time(csv_data):
+    csv_file = open(csv_data, "r", encoding="ms932", errors="", newline="" )
+    csv_read = csv.reader(csv_file, delimiter=",", doublequote=True, lineterminator="\r\n", quotechar='"', skipinitialspace=True)
 
-csv_file = open("BBC_news.csv", "r", encoding="ms932", errors="", newline="" )
-csv_read = csv.reader(csv_file, delimiter=",", doublequote=True, lineterminator="\r\n", quotechar='"', skipinitialspace=True)
-for row in csv_read:
-    day, time = row[0], row[1]
-csv_file.close()
+    
+    for row in csv_read:
+        #print(row)
+        day, time = row[0], row[1]
+    
+    csv_file.close()
+    #print("aaaaaa")
+   
+    
+    new_date, new_time = day.split()
 
-new_date, new_time = day.split()
+    article_time = new_date + ' ' +  time
 
-article_time = new_date + ' ' +  time
+    one_day = timedelta(days=1)
+    five_minute = timedelta(minutes=5)
 
-one_day = timedelta(days=1)
-five_minute = timedelta(minutes=5)
+    article_time = datetime.strptime(article_time, "%Y/%m/%d %H:%M ")
 
-article_time = datetime.strptime(article_time, "%Y/%m/%d %H:%M ")
+    article_time -= five_minute
+    article_time = datetime_change(article_time)
 
-article_time -= five_minute
-article_time = datetime_change(article_time)
-
-print(article_time)
-
+    return article_time
 
 
 
@@ -72,94 +78,62 @@ def date_string(date):
     return date.strftime('%Y/%m/%d %H:%M:%S')
 
 
-ACCOUNT_ID = "1401673"
-ACCESS_TOKEN = "88cb1d105fa6e388042747e4bfea5943-a4d0a01845fd3924f3aaf6ab10fce462"
- 
-oanda = oandapy.API(environment="practice", access_token=ACCESS_TOKEN)
- 
+def get_oanda_data():
+    ACCOUNT_ID = "1401673"
+    ACCESS_TOKEN = "88cb1d105fa6e388042747e4bfea5943-a4d0a01845fd3924f3aaf6ab10fce462"
+    
+    oanda = oandapy.API(environment="practice", access_token=ACCESS_TOKEN)
+    
 
-#response = oanda.get_history(instrument="GBP_JPY", granularity="M5")
+    for i in range(1):
+        if i == 0:
+            res_hist = oanda.get_history(instrument="GBP_JPY", granularity="M5", count=5000)
+        else:
+            res_hist = oanda.get_history(instrument="GBP_JPY", granularity="M5",end=endtime, count=5000)
+        res = res_hist.get("candles")
+        endtime = res[0]['time']
+        if i == 0 : res1 = res
+        else :
+            for j in range(len(res1)):
+                res.append(res1[j])
+            res1 = res
+        print('res ok', i+1, 'and', 'time =', res1[0]['time'])
+    
+    #データフレームに変換しておく
+    res2= pd.DataFrame(res1)
 
-#res = pd.DataFrame(response["candles"])
- 
-# 最初の5行を表示させる
-#res.head()
- 
-#res['time'] = res['time'].apply(lambda x: iso_jp(x))
-#res['time'] = res['time'].apply(lambda x: date_string(x))
- 
-#print(res.head())
- 
-#df = res[['time', 'openAsk', 'closeAsk', 'highAsk', 'lowAsk', 'volume']]
-#df.columns = ['time', 'open', 'close', 'high', 'low', 'volume']
- 
-
-for i in range(1):
-    if i == 0:
-        res_hist = oanda.get_history(instrument="GBP_JPY", granularity="M5", count=5000)
-    else:
-        res_hist = oanda.get_history(instrument="GBP_JPY", granularity="M5",end=endtime, count=5000)
-    res = res_hist.get("candles")
-    endtime = res[0]['time']
-    if i == 0 : res1 = res
-    else :
-        for j in range(len(res1)):
-            res.append(res1[j])
-        res1 = res
-    print('res ok', i+1, 'and', 'time =', res1[0]['time'])
- 
-#データフレームに変換しておく
-res2= pd.DataFrame(res1)
-
- 
-#取得件数を数えて出力
-#print(len(df))
-res2["time"] = res2["time"].apply(lambda x: iso_jp(x))
-res2['time'] = res2['time'].apply(lambda x: date_string(x))
-
-#print(res2)
-
-df = res2[['time','closeAsk']]
-df.columns = ['time','close']
+    #取得件数を数えて出力
+    #print(len(df))
+    res2["time"] = res2["time"].apply(lambda x: iso_jp(x))
+    res2['time'] = res2['time'].apply(lambda x: date_string(x))
 
 
+    df = res2[['time','closeAsk']]
+    df.columns = ['time','close']
 
-#print(df[479:480])
-#print(df[14799:14800])
-#print(article_time)
-predict_data = df[df['time'] >= article_time]
-#print(predict_data)
-#print(predict_data.head(4)))
-predict_data_15minute = predict_data.head(4)
-print(predict_data_15minute)
+    return df
 
-print(predict_data_15minute.iat[0, 1])
-print(predict_data_15minute.iat[3, 1])
-predict_price_change = predict_data_15minute.iat[0, 1]  - predict_data_15minute.iat[3, 1]
+
+def get_price_change(df, article_time):
+    predict_data = df[df['time'] >= article_time]
+
+    predict_data_15minute = predict_data.head(4)
+
+    predict_price_change = predict_data_15minute.iat[0, 1]  - predict_data_15minute.iat[3, 1]
+
+    if predict_price_change > 0.5:
+        level = 0
+    if 0 <= predict_price_change <= 0.5:
+        level = 1
+    if -0.5 <= predict_price_change < 0:
+        level = 2
+    if predict_price_change < -0.5:
+        level = 3
+    return level
+
+make_csv(csv_data)
+article_time = get_article_time(csv_data)
+df = get_oanda_data()
+predict_price_change = get_price_change(df, article_time)
+
 print(predict_price_change)
-
-"""
-split_date = '2019/07/19 20:40:00'
-train, test = df[df['time'] < split_date], df[df['time']>=split_date]
-del train['time']
-del test['time']
-"""
-
-"""
-
-# windowを設定
-window_len = 12
-
-batch_size = 1
-
-# LSTMへの入力用に処理（訓練）
-train_lstm_in = []
-for i in range(len(train) - window_len):
-    temp = train[i:(i + window_len)].copy()
-    for col in train:      
-        temp.loc[:, col] = temp[col] / temp[col].iloc[0] - 1
-    train_lstm_in.append(temp)
- 
-lstm_train_out = (train['close'][window_len:].values / train['close'][:-window_len].values)-1
-
-"""

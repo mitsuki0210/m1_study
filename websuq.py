@@ -4,7 +4,7 @@ from bs4 import BeautifulSoup
 from datetime import datetime
 import csv
 import time
-
+from honbunsuq import get_article_body
 
 
 
@@ -36,6 +36,7 @@ while True:
     # csvを追記モードで開きます→ここでcsvを開くのはファイルが大きくなった時にcsvを開くのに時間がかかるためです
     f = open('BBC_news.csv', 'a')
     writer = csv.writer(f, lineterminator='\n')
+    
 
     # 59分になりましたが正確な時間に測定をするために秒間隔で59秒になるまで抜け出せません
     while datetime.now().second != 59:
@@ -66,7 +67,7 @@ while True:
     latest_time_list = []
 
 
-    # for分で全てのspan要素の中からClass="mkc-stock_prices"となっている物を探します
+    
 
     for latest in div_BBC:
         #append(nikkei_heikin_topnews, tag.string)
@@ -84,7 +85,7 @@ while True:
             # 摘出したclassの文字列にmkc-stock_pricesと設定されているかを調べます
             if string_ in "lx-stream":
                 # mkc-stock_pricesが設定されているのでtagで囲まれた文字列を.stringであぶり出します
-                latest_news_string = latest
+                latest_news_string_ = latest
                 # 摘出が完了したのでfor分を抜けます
                 break
         except:
@@ -92,7 +93,7 @@ while True:
             pass
 
 
-    latest_news_string = latest_news_string.find_all("span")
+    latest_news_string = latest_news_string_.find_all("span")
 
 #Latest Updataから記事のタイトルと記事の日付を取得
     for i in range(len(latest_news_string)):
@@ -114,9 +115,15 @@ while True:
     #Latest Updateの最新の記事日付を取得
     most_latest_news_time = latest_time_list[0]
 
+    
+    
 
     if(most_latest_news_title != top_news_title):
         # 現在の時刻を年、月、日、時、分、秒で取得します
+        article_body = get_article_body(latest_news_string_)
+        if(article_body == 0):
+            print("形式違いのため更新なし")
+            continue
         time_ = datetime.now().strftime("%Y/%m/%d %H:%M:%S")
         # 1カラム目に時間を挿入します
         csv_list.append(time_)
@@ -125,6 +132,8 @@ while True:
         # 3カラム目に記事のタイトルを記録します
         csv_list.append(most_latest_news_title)
          # 摘出した日経平均株価を時間とともに出力します。
+        csv_list.append(article_body)
+
         print("記事の更新あり")
         print(time_, most_latest_news_time, most_latest_news_title)
 
@@ -134,6 +143,7 @@ while True:
     else:
         print("記事の更新なし")
     # ファイル破損防止のために閉じます
+
     f.close()
 
 
