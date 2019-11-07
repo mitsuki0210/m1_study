@@ -13,6 +13,7 @@ import oandapy
 csv_data = "BBC_news.csv"
 
 def datetime_change(a_t):
+    one_day = timedelta(days=1)
     if(16 <= a_t.hour <= 23):
         a_t -= one_day
         a_t = "{0:%Y/%m/%d %H:%M:%S}".format(a_t)
@@ -43,7 +44,7 @@ def get_article_time(csv_data):
 
     article_time = new_date + ' ' +  time
 
-    one_day = timedelta(days=1)
+
     five_minute = timedelta(minutes=5)
 
     article_time = datetime.strptime(article_time, "%Y/%m/%d %H:%M ")
@@ -85,7 +86,7 @@ def get_oanda_data():
     oanda = oandapy.API(environment="practice", access_token=ACCESS_TOKEN)
     
 
-    for i in range(1):
+    for i in range(6):
         if i == 0:
             res_hist = oanda.get_history(instrument="GBP_JPY", granularity="M5", count=5000)
         else:
@@ -121,19 +122,21 @@ def get_price_change(df, article_time):
 
     predict_price_change = predict_data_15minute.iat[0, 1]  - predict_data_15minute.iat[3, 1]
 
-    if predict_price_change > 0.5:
+    if predict_price_change > 0.1:
         level = 0
-    if 0 <= predict_price_change <= 0.5:
+    if 0 <= predict_price_change <= 0.1:
         level = 1
-    if -0.5 <= predict_price_change < 0:
+    if -0.1 <= predict_price_change < 0:
         level = 2
-    if predict_price_change < -0.5:
+    if predict_price_change < -0.1:
         level = 3
     return level
 
+"""
 make_csv(csv_data)
 article_time = get_article_time(csv_data)
 df = get_oanda_data()
 predict_price_change = get_price_change(df, article_time)
 
 print(predict_price_change)
+"""

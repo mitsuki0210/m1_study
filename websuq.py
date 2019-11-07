@@ -16,6 +16,7 @@ f = open('BBC_news.csv', 'a')
 writer = csv.writer(f, lineterminator='\n')
 f.close()
 
+"""
 csv_file = open("BBC_news.csv", "r", encoding="ms932", errors="", newline="" )
 csv_read = csv.reader(csv_file, delimiter=",", doublequote=True, lineterminator="\r\n", quotechar='"', skipinitialspace=True)
 for row in csv_read:
@@ -23,6 +24,7 @@ for row in csv_read:
 csv_file.close()
 
 print("top_news_title is ",top_news_title)
+"""
 
 # 永久に実行させます
 while True:

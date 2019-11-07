@@ -15,6 +15,7 @@ import oandapy
 csv_data = "BBC_news.csv"
 
 def make_data(csv_data):
+    data_list_ = []
     df = get_oanda_data()
     list_ = []
     count = 0
@@ -31,10 +32,11 @@ def make_data(csv_data):
             article_time -= five_minute
             article_time = datetime_change(article_time)
             predict_price_change = get_price_change(df, article_time)
+            data_list_.append(predict_price_change)
             list__.append(l[3])
             list__.append(predict_price_change)
             list_.append(list__)
-        
+    print(data_list_)
     return list_
 
 

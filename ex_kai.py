@@ -59,11 +59,11 @@ oanda = oandapy.API(environment="practice", access_token=ACCESS_TOKEN)
 #df.columns = ['time', 'open', 'close', 'high', 'low', 'volume']
  
 
-for i in range(1):
+for i in range(6):
     if i == 0:
-        res_hist = oanda.get_history(instrument="GBP_JPY", granularity="M5", count=500)
+        res_hist = oanda.get_history(instrument="GBP_JPY", granularity="M5", count=5000)
     else:
-        res_hist = oanda.get_history(instrument="GBP_JPY", granularity="M5",end=endtime, count=500)
+        res_hist = oanda.get_history(instrument="GBP_JPY", granularity="M5",end=endtime, count=5000)
     res = res_hist.get("candles")
     endtime = res[0]['time']
     if i == 0 : res1 = res
@@ -83,7 +83,7 @@ res2["time"] = res2["time"].apply(lambda x: iso_jp(x))
 res2['time'] = res2['time'].apply(lambda x: date_string(x))
 
 
-
+#print(res2)
 
 df = res2[['time','closeAsk']]
 df.columns = ['time','close']
@@ -91,11 +91,12 @@ df.columns = ['time','close']
 
 
 
-print(df[479:480])
-#print(df[24999:25000])
+
+#print(df[479:480])
+print(df[24999:25000])
 
 
-split_date = '2019/10/23 15:30:00'
+split_date = '2019/09/27 12:45:00'
 train, test = df[df['time'] < split_date], df[df['time']>=split_date]
 del train['time']
 del test['time']
@@ -111,19 +112,11 @@ batch_size = 1
 train_lstm_in = []
 for i in range(len(train) - window_len):
     temp = train[i:(i + window_len)].copy()
-    print(temp)
     for col in train:      
         temp.loc[:, col] = temp[col] / temp[col].iloc[0] - 1
-    print(temp)
     train_lstm_in.append(temp)
-    break
-    
-
  
 lstm_train_out = (train['close'][window_len:].values / train['close'][:-window_len].values)-1
-
-print(train['close'][window_len:].values[0])
-print(lstm_train_out[0])
 
 """
 lstm_train_out_bi = []
@@ -156,7 +149,7 @@ train_lstm_in = np.array(train_lstm_in)
 test_lstm_in = [np.array(test_lstm_input) for test_lstm_input in test_lstm_in]
 test_lstm_in = np.array(test_lstm_in)
 
-"""
+
 # LSTMのモデルを設定
 def build_model(inputs, output_size, neurons, activ_func="linear",
                 dropout=0.25, loss="mae", optimizer="adam"):
@@ -184,15 +177,16 @@ print(lstm_test_out.shape)
 
 yen_model.summary()
 
+
 #print(test_lstm_in)
 
 
 
 
-
+"""
 # データを流してフィッティングさせましょう
 yen_history = yen_model.fit(train_lstm_in, lstm_train_out, 
-                            epochs=20, batch_size=5, verbose=2, shuffle=True)
+                            epochs=50, batch_size=10, verbose=2, shuffle=True)
 
 
 model_arc_json = yen_model.to_json()
@@ -200,8 +194,9 @@ open("fx_predict.json", mode='w').write(model_arc_json)
 
 # 学習済みの重みを保存
 yen_model.save_weights('fx_predict_weight.hdf5')
+
 """
-"""
+
 MODEL_ARC_PATH = 'fx_predict.json'
 WEIGHTS_PATH = 'fx_predict_weight.hdf5'
 
@@ -217,19 +212,24 @@ yen_model.load_weights(WEIGHTS_PATH)
 yen_model.summary()
 
 
-#予測精度をみる１~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-print(test_lstm_in[0])
+
+
 
 predict_test = yen_model.predict(test_lstm_in)
 predict_test = predict_test.flatten() 
-print(predict_test[0])
+
+print(predict_test.shape)
+print(test_lstm_in.shape)
+
+
+"""
 
 predict_test_bi = []
 
 for i  in range(len(predict_test)):
-    if(predict_test[i] >=0):
+    if(predict_test[i] - test_lstm_in[i][-1]  >=0):
         predict_test_bi.append(1)
-    else:
+    elif(predict_test[i] - test_lstm_in[i][-1] < 0):
         predict_test_bi.append(0)
 predict_test_bi = np.array(predict_test_bi)
 print("predict_test_bi",predict_test_bi)
@@ -239,9 +239,9 @@ print("predict_test_bi.shape",predict_test_bi.shape)
 test_out_bi = []
 
 for i  in range(len(lstm_test_out)):
-    if(lstm_test_out[i] >=0):
+    if(lstm_test_out[i] - test_lstm_in[i][-1] >=0):
         test_out_bi.append(1)
-    else:
+    elif(lstm_test_out[i] - test_lstm_in[i][-1] < 0):
         test_out_bi.append(0)
 test_out_bi = np.array(test_out_bi)
 
@@ -272,27 +272,17 @@ print("テストデータの下げのデータ数",test_bi_down_count,"個")
 
 print("binarry_testdata_accuracy is",accuracy, "%")
 
-"""
-"""
-fig, ax1 = plt.subplots(1,1)
-ax1.plot(df[df['time']>= split_date]['time'][window_len:],
-         test['close'][window_len:], label='Actual', color='blue')
-ax1.plot(df[df['time']>= split_date]['time'][window_len:],
-         (predict_test +1) * test['close'].values[:-window_len], 
-         label='Predicted', color='red')
-ax1.grid(True)
-plt.show()
-"""
-"""
+
+
 predict_train = yen_model.predict(train_lstm_in)
 predict_train = predict_train.flatten() 
 
-predict_train_bi = []
+predict_train_bi = []   
 
 for i  in range(len(predict_train)):
-    if(predict_train[i] >=0):
+    if(predict_train[i] - train_lstm_in[i][-1] >=0):
         predict_train_bi.append(1)
-    else:
+    elif(predict_train[i] - train_lstm_in[i][-1] < 0):
         predict_train_bi.append(0)
 predict_train_bi = np.array(predict_train_bi)
 print("predict_train_bi",predict_train_bi)
@@ -302,9 +292,9 @@ print("predict_train_bi.shape",predict_train_bi.shape)
 train_out_bi = []
 
 for i  in range(len(lstm_train_out)):
-    if(lstm_train_out[i] >=0):
+    if(lstm_train_out[i] - train_lstm_in[i][-1] >=0):
         train_out_bi.append(1)
-    else:
+    elif(lstm_train_out[i] - train_lstm_in[i][-1] < 0):
         train_out_bi.append(0)
 train_out_bi = np.array(train_out_bi)
 
@@ -332,35 +322,26 @@ print("訓練データの上げのデータ数",train_bi_up_count,"個")
 print("訓練データの下げのデータ数",train_bi_down_count,"個")
 
 print("binarry_traindata_accuracy is",accuracy, "%")
-"""
-"""
-fig, ax1 = plt.subplots(1,1)
-ax1.plot(df[df['time']< split_date]['time'][window_len:],
-         train['close'][window_len:], label='Actual', color='blue')
-ax1.plot(df[df['time']< split_date]['time'][window_len:],
-         (predict_train+1) * train['close'].values[:-window_len], 
-         label='Predicted', color='red')
-plt.show()
-"""
-"""
+
+
 #----------------------------------------------
 #predict_test = yen_model.predict(test_lstm_in)
 #predict_test = predict_test.flatten() 
 
 predict_test_four = []
-threshold = 0.0005 #閾値
+threshold = 0.0002 #閾値
 print(threshold)
 
 #print(predict_test)
 
 for i  in range(len(predict_test)):
-    if(predict_test[i] >= threshold):
+    if(predict_test[i] - test_lstm_in[i][-1] >= threshold):
         predict_test_four.append(0)
-    elif(0<= predict_test[i] < threshold):
+    elif(0<= predict_test[i] - test_lstm_in[i][-1] < threshold):
         predict_test_four.append(1)
-    elif(-threshold <= predict_test[i] < 0):
+    elif(-threshold <= predict_test[i] - test_lstm_in[i][-1] < 0):
         predict_test_four.append(2)
-    elif(predict_test[i] < -threshold):
+    elif(predict_test[i] - test_lstm_in[i][-1] < -threshold):
         predict_test_four.append(3)
 predict_test_four = np.array(predict_test_four)
 print("predict_test_four",predict_test_four)
@@ -372,13 +353,13 @@ test_out_four = []
 #print(lstm_test_out)
 
 for i  in range(len(lstm_test_out)):
-    if(lstm_test_out[i] >= threshold):
+    if(lstm_test_out[i] - test_lstm_in[i][-1] >= threshold):
         test_out_four.append(0)
-    elif(0<= lstm_test_out[i] < threshold):
+    elif(0<= lstm_test_out[i] - test_lstm_in[i][-1] < threshold):
         test_out_four.append(1)
-    elif(-threshold <= lstm_test_out[i] < 0):
+    elif(-threshold <= lstm_test_out[i] - test_lstm_in[i][-1] < 0):
         test_out_four.append(2)
-    elif(lstm_test_out[i] < -threshold):
+    elif(lstm_test_out[i] - test_lstm_in[i][-1] < -threshold):
         test_out_four.append(3)
 test_out_four = np.array(test_out_four)
 
@@ -417,21 +398,11 @@ print("テストデータの3のデータ数",test_3_count,"個")
 
 
 print("four_testdata_accuracy is",accuracy, "%")
-"""
-"""
-
-fig, ax1 = plt.subplots(1,1)
-ax1.plot(df[df['time']>= split_date]['time'][window_len:],
-         test['close'][window_len:], label='Actual', color='blue')
-ax1.plot(df[df['time']>= split_date]['time'][window_len:],
-         (predict_test +1) * test['close'].values[:-window_len], 
-         label='Predicted', color='red')
-ax1.grid(True)
-plt.show()
-"""
 
 
-"""
+
+
+
 
 #predict_train = yen_model.predict(train_lstm_in)
 #predict_train = predict_train.flatten() 
@@ -439,13 +410,13 @@ plt.show()
 predict_train_four = []
 
 for i  in range(len(predict_train)):
-    if(predict_train[i] >= threshold):
+    if(predict_train[i] - train_lstm_in[i][-1] >= threshold):
         predict_train_four.append(0)
-    elif(0<= predict_train[i] < threshold):
+    elif(0<= predict_train[i] -  train_lstm_in[i][-1] < threshold):
         predict_train_four.append(1)
-    elif(-threshold <= predict_train[i] < 0):
+    elif(-threshold <= predict_train[i] - train_lstm_in[i][-1] < 0):
         predict_train_four.append(2)
-    elif(predict_train[i] < -threshold):
+    elif(predict_train[i] - train_lstm_in[i][-1] < -threshold):
         predict_train_four.append(3)
 predict_train_four = np.array(predict_train_four)
 print("predict_train",predict_train)
@@ -456,13 +427,13 @@ print("predict_train_four.shape",predict_train_four.shape)
 train_out_four = []
 
 for i  in range(len(lstm_train_out)):
-    if(lstm_train_out[i] >= threshold):
+    if(lstm_train_out[i] - train_lstm_in[i][-1] >= threshold):
         train_out_four.append(0)
-    elif(0<= lstm_train_out[i] < threshold):
+    elif(0<= lstm_train_out[i] - train_lstm_in[i][-1] < threshold):
         train_out_four.append(1)
-    elif(-threshold <= lstm_train_out[i] < 0):
+    elif(-threshold <= lstm_train_out[i] - train_lstm_in[i][-1] < 0):
         train_out_four.append(2)
-    elif(lstm_train_out[i] < -threshold):
+    elif(lstm_train_out[i] - train_lstm_in[i][-1] < -threshold):
         train_out_four.append(3)
 train_out_four = np.array(train_out_four)
 
@@ -500,52 +471,12 @@ print("訓練データの2のデータ数",train_2_count,"個")
 print("訓練データの3のデータ数",train_3_count,"個")
 
 print("four_traindata_accuracy is",accuracy, "%")
-"""
-"""
-fig, ax1 = plt.subplots(1,1)
-ax1.plot(df[df['time']< split_date]['time'][window_len:],
-         train['close'][window_len:], label='Actual', color='blue')
-ax1.plot(df[df['time']< split_date]['time'][window_len:],
-         (predict_train+1) * train['close'].values[:-window_len], 
-         label='Predicted', color='red')
-plt.show()
+
+
+
 """
 
-#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-
-
-
-
-
-
-
-
-#予測精度を見る２^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-"""
-Lot = 0.1
-Tsuka = 100000
-yen = Lot * Tsuka 
-#pal = pfofit and loss
-
-predict_test = yen_model.predict(test_lstm_in)
-predict_test = predict_test.flatten()
-Totalpal = 0 
-print(len(predict_test))
-
-for i in range(len(predict_test)-window_len):
-    print(i)
-    print(Totalpal)
-    if(predict_test[i] < 0):
-        pal = (test['close'][:-window_len].values[i] - test['close'][:-window_len].values[i + window_len]) * yen
-        Totalpal += pal
-    elif(predict_test[i] >= 0):
-        pal = (test['close'][:-window_len].values[i + window_len] - test['close'][:-window_len].values[i]) * yen
-        Totalpal += pal
-    
-print("利益は",Totalpal,"円です。")
-"""
-"""
 #Lot = 0.1
 Tsuka = 10000
 total_money = 1000000
@@ -649,96 +580,3 @@ ax1.plot(trade_count_list, total_money_per)
 ax1.set_xlabel("Number of trades")
 ax1.set_ylabel("Total assets increase rate (%)")
 plt.show()
-
-"""
-#^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-
-
-
-#１時間先を予測する----------------------------------------------------------------
-"""
-#print(np.transpose(yen_model.predict(test_lstm_in))+1)
-def one_hour_predict():
-
-    predict_seed = (np.transpose(yen_model.predict(test_lstm_in[-13:-1])+1) * test['close'].values[-(window_len + 13):-(1 + window_len)])[0]
-
-    #print(predict_seed)
-    predict_seed = np.reshape(predict_seed,(12,1))
-
-    predict_seed = np.array(predict_seed)
-    predict_len = 12
-
-    predict_price_list = [] #予想された変動価格
-    #predict_price_list.append(predict_seed)
-    #predict_price_list = np.array(predict_price_list)
-    predict = np.array([predict_seed])
-    #print(predict)
-    count = 0
-    for i in range(predict_len):
-        count += 1
-        #print(count)
-        temp = predict.copy()
-        #for col in predict:
-        temp = temp/ temp[0][0] - 1
-        #print(temp)
-        predict_price = yen_model.predict(temp)
-        #print('predict_price',predict_price)
-        predict_price =  (predict_price+1) * predict[0][0]
-        #print('predict_price',predict_price)
-        predict_price_list = np.append(predict_price_list,predict_price)
-        #print('predict_price_list',predict_price_list)
-        predict = np.append(predict,predict_price)
-        #print('predict',predict)
-        predict = np.delete(predict, 0) 
-        #print('predict',predict)
-        predict = np.array([np.reshape(predict,(12,1))])
-    # print('predict',predict)
-        
-
-    print(predict_price_list)
-    return predict_price_list
-
-#-------------------------------------------------------------------------
-
-
-
- # MAEをプロット
-fig, ax1 = plt.subplots(1,1)
-
- 
-ax1.plot(yen_history.epoch, yen_history.history['loss'])
-ax1.set_title('TrainingError')
- 
-if yen_model.loss == 'mae':
-    ax1.set_ylabel('Mean Absolute Error (MAE)',fontsize=12)
-else:
-    ax1.set_ylabel('Model Loss',fontsize=12)
-ax1.set_xlabel('# Epochs',fontsize=12)
-plt.show()
- 
-
-#print((np.transpose(yen_model.predict(test_lstm_in))+1))
-#print(test['close'].values[:-window_len])
-
-# 訓練データから予測をして正解レートと予測したレートをプロット
-fig, ax1 = plt.subplots(1,1)
-ax1.plot(df[df['time']< split_date]['time'][window_len:],
-         train['close'][window_len:], label='Actual', color='blue')
-ax1.plot(df[df['time']< split_date]['time'][window_len:],
-         ((np.transpose(yen_model.predict(train_lstm_in))+1) * train['close'].values[:-window_len])[0], 
-         label='Predicted', color='red')
-plt.show()
-
-
-# テストデータを使って予測＆プロット
-fig, ax1 = plt.subplots(1,1)
-ax1.plot(df[df['time']>= split_date]['time'][window_len:],
-         test['close'][window_len:], label='Actual', color='blue')
-ax1.plot(df[df['time']>= split_date]['time'][window_len:],
-         ((np.transpose(yen_model.predict(test_lstm_in))+1) * test['close'].values[:-window_len])[0], 
-         label='Predicted', color='red')
-ax1.grid(True)
-plt.show()
-
-"""
