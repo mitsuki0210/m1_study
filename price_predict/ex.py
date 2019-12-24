@@ -12,6 +12,8 @@ from keras.models import Sequential
 from keras.layers import Activation, Dense
 from keras.layers import LSTM, Embedding
 from keras.layers import Dropout
+from keras import metrics
+from keras.models import model_from_json
 
 # 日付の調整する
 # 文字列 -> datetime
@@ -40,24 +42,24 @@ ACCESS_TOKEN = "88cb1d105fa6e388042747e4bfea5943-a4d0a01845fd3924f3aaf6ab10fce46
  
 oanda = oandapy.API(environment="practice", access_token=ACCESS_TOKEN)
  
-""" 
-response = oanda.get_history(instrument="GBP_JPY", granularity="M5")
 
-res = pd.DataFrame(response["candles"])
+#response = oanda.get_history(instrument="GBP_JPY", granularity="M5")
+
+#res = pd.DataFrame(response["candles"])
  
 # 最初の5行を表示させる
-res.head()
+#res.head()
  
-res['time'] = res['time'].apply(lambda x: iso_jp(x))
-res['time'] = res['time'].apply(lambda x: date_string(x))
+#res['time'] = res['time'].apply(lambda x: iso_jp(x))
+#res['time'] = res['time'].apply(lambda x: date_string(x))
  
 #print(res.head())
  
-df = res[['time', 'openAsk', 'closeAsk', 'highAsk', 'lowAsk', 'volume']]
-df.columns = ['time', 'open', 'close', 'high', 'low', 'volume']
+#df = res[['time', 'openAsk', 'closeAsk', 'highAsk', 'lowAsk', 'volume']]
+#df.columns = ['time', 'open', 'close', 'high', 'low', 'volume']
  
-"""
-for i in range(5):
+
+for i in range(6):
     if i == 0:
         res_hist = oanda.get_history(instrument="GBP_JPY", granularity="M5", count=5000)
     else:
@@ -73,54 +75,50 @@ for i in range(5):
  
 #データフレームに変換しておく
 res2= pd.DataFrame(res1)
+
  
 #取得件数を数えて出力
 #print(len(df))
 res2["time"] = res2["time"].apply(lambda x: iso_jp(x))
-
-print(res2)
-
-df = res2[['time', 'openAsk', 'closeAsk', 'highAsk', 'lowAsk', 'volume']]
-df.columns = ['time', 'open', 'close', 'high', 'low', 'volume']
+res2['time'] = res2['time'].apply(lambda x: date_string(x))
 
 
 
-print(df[19999:20000])
 
-"""
+df = res2[['time','closeAsk','highAsk','lowAsk','openAsk']]
+df.columns = ['time','close','high','low','open']
 
-split_date = '2019/06/11 06:55:00'
+
+
+
+#print(df[479:480])
+print(df[24999:25000])
+
+
+split_date = '2019/10/24 03:25:00'
 train, test = df[df['time'] < split_date], df[df['time']>=split_date]
 del train['time']
 del test['time']
 
 
-# 念のため確認
-#print(train)
-#print(train.shape)  #['open', 'close', 'high', 'low', 'volume']
 
 # windowを設定
-window_len = 36
+window_len = 12
 
 batch_size = 1
-
 
 # LSTMへの入力用に処理（訓練）
 train_lstm_in = []
 for i in range(len(train) - window_len):
     temp = train[i:(i + window_len)].copy()
-    for col in train:
+    for col in train:      
         temp.loc[:, col] = temp[col] / temp[col].iloc[0] - 1
     train_lstm_in.append(temp)
-  #  print(train_lstm_in)
-  #  print("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n")
-lstm_train_out = (train['close'][window_len:].values / train['close'][:-window_len].values)-1
-#lstm_train_out = (train[window_len:].values / train[:-window_len].values)-1
+    
+    
  
-#print(train_lstm_in) 
+lstm_train_out = (train[window_len:].values / train[:-window_len].values)-1
 
-#print("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
-#print(lstm_train_out.shape)
 
 
 # LSTMへの入力用に処理（テスト）
@@ -130,29 +128,23 @@ for i in range(len(test) - window_len):
     for col in test:
         temp.loc[:, col] = temp[col] / temp[col].iloc[0] - 1
     test_lstm_in.append(temp)
-lstm_test_out = (test['close'][window_len:].values / test['close'][:-window_len].values)-1
+
+
+lstm_test_out = (test[window_len:].values / test[:-window_len].values)-1
  
+
 
 
 # PandasのデータフレームからNumpy配列へ変換しましょう
 train_lstm_in = [np.array(train_lstm_input) for train_lstm_input in train_lstm_in]
-#print(train_lstm_in)
 train_lstm_in = np.array(train_lstm_in)
-#print("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
-
-#print(train_lstm_in)
-print(train_lstm_in.shape)
-#print(train_lstm_in)
-print(lstm_train_out.shape)
-#rint(lstm_train_out)
 
 
 test_lstm_in = [np.array(test_lstm_input) for test_lstm_input in test_lstm_in]
 test_lstm_in = np.array(test_lstm_in)
 
 
-
-
+"""
 
 # LSTMのモデルを設定
 def build_model(inputs, output_size, neurons, activ_func="linear",
@@ -168,54 +160,54 @@ def build_model(inputs, output_size, neurons, activ_func="linear",
 
 # ランダムシードの設定
 np.random.seed(202)
- 
-# 初期モデルの構築
-yen_model = build_model(train_lstm_in, output_size=1, neurons = 20)
-#print(train_lstm_in.shape)
 
-#print(train_lstm_in[1][1].shape)
-yen_model.summary()
+#print(train_lstm_in)
+# 初期モデルの構築
+yen_model = build_model(train_lstm_in, output_size=4, neurons = 20)
+
+
+print(train_lstm_in.shape)  
+
+
+print(lstm_train_out.shape)
+
+
+
+
+
 
 
 # データを流してフィッティングさせましょう
 yen_history = yen_model.fit(train_lstm_in, lstm_train_out, 
-                            epochs=50, batch_size=1, verbose=2, shuffle=True)
- 
+                            epochs=20, batch_size=10, verbose=2, shuffle=True)
 
+
+model_arc_json = yen_model.to_json()
+open("../weight/fx_predict.json", mode='w').write(model_arc_json)
+
+# 学習済みの重みを保存
+yen_model.save_weights('../weight/fx_predict_weight.hdf5')
 """
-"""
- # MAEをプロットしてみよう
-fig, ax1 = plt.subplots(1,1)
 
- 
-ax1.plot(yen_history.epoch, yen_history.history['loss'])
-ax1.set_title('TrainingError')
- 
-if yen_model.loss == 'mae':
-    ax1.set_ylabel('Mean Absolute Error (MAE)',fontsize=12)
-else:
-    ax1.set_ylabel('Model Loss',fontsize=12)
-ax1.set_xlabel('# Epochs',fontsize=12)
-plt.show()
- 
+MODEL_ARC_PATH = '../weight/fx_predict.json'
+WEIGHTS_PATH = '../weight/fx_predict_weight.hdf5'
 
 
-# 訓練データから予測をして正解レートと予測したレートをプロット
-fig, ax1 = plt.subplots(1,1)
-ax1.plot(df[df['time']< split_date]['time'][window_len:],
-         train['close'][window_len:], label='Actual', color='blue')
-ax1.plot(df[df['time']< split_date]['time'][window_len:],
-         ((np.transpose(yen_model.predict(train_lstm_in))+1) * train['close'].values[:-window_len])[0], 
-         label='Predicted', color='red')
-plt.show()
 
-# テストデータを使って予測＆プロット
-fig, ax1 = plt.subplots(1,1)
-ax1.plot(df[df['time']>= split_date]['time'][window_len:],
-         test['close'][window_len:], label='Actual', color='blue')
-ax1.plot(df[df['time']>= split_date]['time'][window_len:],
-         ((np.transpose(yen_model.predict(test_lstm_in))+1) * test['close'].values[:-window_len])[0], 
-         label='Predicted', color='red')
-ax1.grid(True)
-plt.show()
-"""
+model_arc_str = open(MODEL_ARC_PATH).read()
+yen_model = model_from_json(model_arc_str)
+
+
+# 重みの読み込み
+yen_model.load_weights(WEIGHTS_PATH)
+
+yen_model.summary()
+
+
+
+
+
+
+
+
+
